@@ -2,9 +2,7 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"regexp"
-	"strings"
 	"testing"
 )
 
@@ -643,42 +641,7 @@ func TestHome(t *testing.T) {
 }
 
 func TestFunc(t *testing.T) {
-	findAllClickableSrc(home)
-}
-
-type Resource struct {
-	Resource map[string]bool
-	Page     map[string]bool
-}
-
-func findAllClickableSrc(in string) (Resource, error) {
-	matched := href.FindAllStringSubmatch(in, -1)
-	var result Resource
-	result.Resource = make(map[string]bool)
-	result.Page = make(map[string]bool)
-	isResource := func(s string) bool {
-		return strings.HasSuffix(strings.ToUpper(s), ".CSS") ||
-			strings.HasSuffix(strings.ToUpper(s), ".JS") ||
-			strings.HasSuffix(strings.ToUpper(s), ".XML") ||
-			strings.HasSuffix(strings.ToUpper(s), ".ICO")
-	}
-	for _, item := range matched {
-		if len(item) <= 1 {
-			log.Fatalf("Can't handle match: %v", item)
-		}
-		find := item[1]
-		if find != "/" {
-			if isResource(find) {
-				log.Printf("Find Resource: %s", find)
-				result.Resource[find] = false
-			} else {
-				log.Printf("Find Link: %s", find)
-				result.Page[find] = false
-			}
-		}
-	}
-
-	return result, nil
+	findPage([]byte(home))
 }
 
 func TestRegex(t *testing.T) {
