@@ -11,59 +11,99 @@ import (
 	"strings"
 )
 
-const root = "."
-
 var href = regexp.MustCompile(`(?:href|src)="(/.*?)"`)
 
-func parsePage(host string, src string) []byte {
-	log.Printf("http request for %s%s start\n", host, src)
-	get, err := http.Get(host + src)
+var categoriesHash = regexp.MustCompile(`(/.*?)/#\S+`)
+
+var cssUrl = regexp.MustCompile(`(?:url|URL)\(['|"]([a-zA-Z0-9.]+).*?['|"]\)`)
+
+func downloadResource(host string, src string) []byte {
+	fullUrl := host + src
+	log.Printf("http request for %s start\n", fullUrl)
+	get, err := http.Get(fullUrl)
 	if err != nil {
-		log.Printf("http request %s%s err in get\n", host, src)
+		log.Printf("http request %s err in get\n", fullUrl)
 		return nil
 	}
 	all, err := ioutil.ReadAll(get.Body)
 	if err != nil {
-		log.Printf("http request %s%s err in read\n", host, src)
+		log.Printf("http request %s err in read\n", fullUrl)
 		return nil
 	}
 	return all
 }
 
-func findPage(data []byte) map[string]bool {
+//对于一些页面进行链接的特殊处理 (带 #hash 的删除 #hash，/ 直接跳过 etc)
+func specUrlHandler(old string) (needHandle bool, newName string) {
+	if old == "/" {
+		return false, ""
+	} else if categoriesHash.MatchString(old) {
+		findRes := categoriesHash.FindAllStringSubmatch(old, -1)
+		if len(findRes) >= 1 && len(findRes[0]) >= 2 {
+			log.Printf("Replace %s to %v", old, findRes[0][1])
+			return true, findRes[0][1]
+		} else {
+			log.Fatalf("Replace %s failed, regExp can't match!", old)
+			return true, old
+		}
+	}
+	return true, old
+}
+
+func findHTML(origin string, data []byte) map[string]bool {
 	in := string(data)
 	matched := href.FindAllStringSubmatch(in, -1)
 	var result = make(map[string]bool)
-	isResource := func(s string) bool {
-		return strings.HasSuffix(strings.ToUpper(s), ".CSS") ||
-			strings.HasSuffix(strings.ToUpper(s), ".JS") ||
-			strings.HasSuffix(strings.ToUpper(s), ".XML") ||
-			strings.HasSuffix(strings.ToUpper(s), ".ICO")
-	}
 	for _, item := range matched {
 		if len(item) <= 1 {
 			log.Fatalf("Can't handle match: %v", item)
 		}
 		find := item[1]
-		if find != "/" {
-			if isResource(find) {
-				log.Printf("Find Resource: %s", find)
-				result[find] = false
-			} else {
-				log.Printf("Find Link: %s", find)
-				result[find] = false
-			}
+		//log.Printf("Find Link: %s", find)
+		pass, renamedFind := specUrlHandler(find)
+		if pass {
+			result[renamedFind] = false
+		} else {
+			log.Printf("Skip %s because policy disallowed it.", find)
 		}
 	}
 	return result
 }
 
-func writePage2File(root string, src string, in []byte) {
-	paths := path.Dir(src)
-	log.Printf("Handleing src %s at path %s\n", src, paths)
+func findCSS(origin string, data []byte) map[string]bool {
+	in := string(data)
+	matched := cssUrl.FindAllStringSubmatch(in, -1)
+	var result = make(map[string]bool)
+	for _, item := range matched {
+		if len(item) <= 1 {
+			log.Fatalf("Can't handle match: %v", item)
+		}
+		find := item[1]
+		//字体文件所在目录为发现的 CSS 目录
+		find = path.Join(path.Dir(origin), find)
+		log.Printf("Find URL in CSS: %s", find)
+		pass, renamedFind := specUrlHandler(find)
+		if pass {
+			result[renamedFind] = false
+		} else {
+			log.Printf("Skip %s because policy disallowed it.", find)
+		}
+	}
+	return result
+}
+
+func writeResource2File(root string, src string, in []byte) {
+	var paths string
+	if path.Ext(src) != "" { ///assert/prism.css -> /assert
+		paths = path.Dir(src)
+	} else { ///page14 -> /page14
+		paths = src
+	}
+	fullPaths := path.Join(root, paths) // /Users/mazhangjing/gen/page14
+	log.Printf("Handleing src %s at path %s\n", src, fullPaths)
 	//for .css resource, fetch dir and try to create it,
 	//if dir exist, do nothing
-	err := os.MkdirAll(paths, os.ModePerm)
+	err := os.MkdirAll(fullPaths, os.ModePerm)
 	if err != nil {
 		log.Printf("Mkdir for %s failed %s\n", src, err)
 		return
@@ -80,24 +120,52 @@ func writePage2File(root string, src string, in []byte) {
 	}
 	err = ioutil.WriteFile(fullFileName, in, fs.ModePerm)
 	if err != nil {
-		log.Printf("Write %s error: %s\n", src, err)
+		log.Fatalf("Write %s error: %s\n", src, err)
 		return
 	}
 }
 
-func handlePage(host string, path string) map[string]bool {
-	pageData := parsePage(host, path)
+//一般情况下将获取到的资源当做 html 查找 href，但也不一定，比如对于资源文件 .css 可直接
+func specFindAction(resource string) func(string, []byte) map[string]bool {
+	if path.Ext(resource) == "" {
+		log.Printf("Finding pointer %s as HTML file to fetch href/src start", resource)
+		return findHTML
+	}
+	if strings.HasSuffix(strings.ToUpper(resource), ".CSS") {
+		log.Printf("Finding pointer %s as CSS file to fetch url start", resource)
+		return findCSS
+	}
+	return func(string, []byte) map[string]bool {
+		log.Printf("Skip finding pointer in %s because it is a resource file", resource)
+		return make(map[string]bool)
+	}
+}
+
+func handleResource(host string, path string, root string) map[string]bool {
+	pageData := downloadResource(host, path)
 	if pageData == nil {
 		log.Fatalf("http fetch for %s failure, exit now", path)
 	}
-	writePage2File(root, path, pageData)
-	pageRes := findPage(pageData)
+	writeResource2File(root, path, pageData)
+	pageRes := specFindAction(path)(path, pageData)
 	return pageRes
 }
 
 func main() {
 	var host = "https://blog.mazhangjing.com"
-	var resource = handlePage(host, "/")
+	//home, _ := os.UserHomeDir()
+	var root = path.Join("/", "www", "wwwroot", "blog-cn.mazhangjing.com", "gen")
+	err := os.RemoveAll(root)
+	if err != nil {
+		log.Fatalf("Can't remove old root %s %v", root, err)
+		return
+	}
+	err = os.Mkdir(root, fs.ModePerm)
+	if err != nil {
+		log.Fatalf("Can't mkdir root %s %v", root, err)
+		return
+	}
+	var resource = handleResource(host, "/", root)
 	var collectRes = make(map[string]bool)
 	allDone := false
 	for {
@@ -106,7 +174,7 @@ func main() {
 			if !ok {
 				allDone = false
 				log.Printf("Start fetch and store %s\n", pageLink)
-				pageFind := handlePage(host, pageLink)
+				pageFind := handleResource(host, pageLink, root)
 				for pageLinkSub := range pageFind {
 					collectRes[pageLinkSub] = false
 				}

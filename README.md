@@ -1,39 +1,15 @@
-# blogParser
+# Github Pages 静态化工具 - blogParser
 
 #### 介绍
-{**以下是 Gitee 平台说明，您可以替换此简介**
-Gitee 是 OSCHINA 推出的基于 Git 的代码托管平台（同时支持 SVN）。专为开发者提供稳定、高效、安全的云端软件开发协作平台
-无论是个人、团队、或是企业，都能够用 Gitee 实现代码托管、项目管理、协作开发。企业项目请看 [https://gitee.com/enterprises](https://gitee.com/enterprises)}
+本工具用于将部署在 Github Pages 的静态博客爬取并保存为静态文件（HTML、CSS、JS、TTF、图片等），以在方便的在云平台使用 Nginx 等静态 Web 服务器进行部署，提高国内主机到站点的访问速度。
 
 #### 软件架构
-软件架构说明
-
-
-#### 安装教程
-
-1.  xxxx
-2.  xxxx
-3.  xxxx
+基于 go 1.16 开发，没有除标准库其他的依赖。本质来说，就是从主页开始，对每个 HTML 的可点击链接、CSS 中引用的资源都进行爬取并递归进行处理，直到所有站内资源都被下载到本地。
 
 #### 使用说明
+直接运行 `go run blogParser.go` 即可，在 main 函数中修改生成资源的位置和需要爬取的 Github Page URL。
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
-
-#### 参与贡献
-
-1.  Fork 本仓库
-2.  新建 Feat_xxx 分支
-3.  提交代码
-4.  新建 Pull Request
-
-
-#### 特技
-
-1.  使用 Readme\_XXX.md 来支持不同的语言，例如 Readme\_en.md, Readme\_zh.md
-2.  Gitee 官方博客 [blog.gitee.com](https://blog.gitee.com)
-3.  你可以 [https://gitee.com/explore](https://gitee.com/explore) 这个地址来了解 Gitee 上的优秀开源项目
-4.  [GVP](https://gitee.com/gvp) 全称是 Gitee 最有价值开源项目，是综合评定出的优秀开源项目
-5.  Gitee 官方提供的使用手册 [https://gitee.com/help](https://gitee.com/help)
-6.  Gitee 封面人物是一档用来展示 Gitee 会员风采的栏目 [https://gitee.com/gitee-stars/](https://gitee.com/gitee-stars/)
+#### TODO
+- 使用 goroutine 加速爬取（暂时搁置，云平台单核心运行，且访问外网速度慢，并行不能带来大幅度性能提升）
+- Github Webhooks 触发自动解析
+- 提供一种机制，使得某些未被修改的资源不用爬取更新，而非每次都将目录整个删除整个网站重新爬取
