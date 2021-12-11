@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"path"
 	"regexp"
 	"testing"
 )
@@ -851,6 +852,8 @@ var cssFake = `@font-face {
 .octicon-x:before { content: '\f081'} /*  */
 .octicon-zap:before { content: '\26A1'} /* ⚡ */`
 
+var css2 = `@font-face{font-family:"iconfont";src:url("../fonts/iconfont.eot");src:url("../fonts/iconfont.eot?#iefix") format("embedded-opentype"),url("../fonts/iconfont.woff") format("woff"),url("../fonts/iconfont.ttf") format("truetype"),url("../fonts/iconfont.svg#iconfont") format("svg")}.iconfont{font-family:"iconfont" !important;font-size:16px;font-style:normal;-webkit-font-smoothing:anti`
+
 var url = regexp.MustCompile(`(https?://[A-Za-z0-9./]*)`)
 
 var resource = regexp.MustCompile(`(?:href|src)="(/.*?\.(?:css|ico|js|xml))"`)
@@ -868,7 +871,14 @@ func TestCategories(t *testing.T) {
 }
 
 func TestCSSFind(t *testing.T) {
-	categoriesHash := regexp.MustCompile(`(?:url|URL)\(['|"]([a-zA-Z0-9.]+).*?['|"]\)`)
-	submatch := categoriesHash.FindAllStringSubmatch(cssFake, -1)
+	categoriesHash := regexp.MustCompile(`(?:url|URL)\(['|"]([a-zA-Z0-9./]+).*?['|"]\)`)
+	submatch := categoriesHash.FindAllStringSubmatch(css2, -1)
 	fmt.Printf("%v", submatch)
+}
+
+func TestJoin(t *testing.T) {
+	join := path.Join(path.Dir("/dist/css/share.min.css"), "../font/iconfont.eot")
+	println(join)
+	join2 := path.Join(path.Dir("/css/oct/oct/oct.css"), "oct.eot")
+	println(join2)
 }

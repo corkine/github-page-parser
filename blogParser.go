@@ -15,7 +15,7 @@ var href = regexp.MustCompile(`(?:href|src)="(/.*?)"`)
 
 var categoriesHash = regexp.MustCompile(`(/.*?)/#\S+`)
 
-var cssUrl = regexp.MustCompile(`(?:url|URL)\(['|"]([a-zA-Z0-9.]+).*?['|"]\)`)
+var cssUrl = regexp.MustCompile(`(?:url|URL)\(['|"]([a-zA-Z0-9./]+).*?['|"]\)`)
 
 func downloadResource(host string, src string) []byte {
 	fullUrl := host + src
@@ -153,8 +153,8 @@ func handleResource(host string, path string, root string) map[string]bool {
 
 func main() {
 	var host = "https://blog.mazhangjing.com"
-	//home, _ := os.UserHomeDir()
-	var root = path.Join("/", "www", "wwwroot", "blog-cn.mazhangjing.com", "gen")
+	home, _ := os.UserHomeDir()
+	var root = path.Join(home, "Desktop", "gen")
 	err := os.RemoveAll(root)
 	if err != nil {
 		log.Fatalf("Can't remove old root %s %v", root, err)
